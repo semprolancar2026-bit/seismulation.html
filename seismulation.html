@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEISMULATION</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root {
+    --primary: #1e3a8a;
+    --primary-light: #2563eb;
+    --accent: #dc2626;
+    --panel-bg: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border: #cbd5e1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f8fafc;
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, #0b192c, #1e3a8a);
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 20;
+  }
+  header h1 { font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  header .subtitle { font-size: 0.78rem; color: #93c5fd; font-weight: 400; }
+
+  /* Workspace Layout */
+  .workspace {
+    display: flex;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 350px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    overflow-y: auto;
+    z-index: 15;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.04);
+  }
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  /* Station Input Group */
+  .station-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .station-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .station-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #1e293b;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+  .coord-input {
+    width: 78px;
+    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    text-align: center;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .coord-input:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+  }
+
+  /* Buttons */
+  .tool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  button.btn {
+    appearance: none;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: var(--text-main);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.15s ease;
+  }
+  button.btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+  button.btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 2px 6px rgba(30,58,138,0.3);
+  }
+  button.btn-primary {
+    background: var(--primary-light);
+    color: #fff;
+    border: none;
+    font-weight: 700;
+  }
+  button.btn-primary:hover { background: #1d4ed8; }
+  button.btn-undo {
+    background: #e2e8f0;
+    color: #1e293b;
+    font-weight: 700;
+  }
+  button.btn-undo:hover {
+    background: #cbd5e1;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 0.78rem;
+  }
+  input[type="range"] {
+    flex: 1;
+    margin: 0 8px;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+  input[type="color"] {
+    border: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+  }
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+  .checkbox-label input { accent-color: var(--primary); }
+
+  /* Manual Radius Input Box */
+  .radius-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 4px;
+  }
+  .radius-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  /* Map Stage */
+  .stage-container {
+    flex: 1;
+    position: relative;
+    background: #c7e9fb;
+    overflow: hidden;
+  }
+  #leafletMap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #c7e9fb;
+    user-select: none;
+  }
+
+  /* Custom station marker (rendered via Leaflet divIcon) */
+  .station-icon-wrap { position: relative; width: 24px; height: 24px; }
+  .station-icon-wrap .tri {
+    position: absolute;
+    top: 0; left: 2px;
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 16px solid #0f172a;
+  }
+  .station-icon-wrap .dot {
+    position: absolute;
+    top: 8px; left: 9px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .station-label {
+    background: rgba(255,255,255,0.9) !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: #0f172a;
+    padding: 1px 5px !important;
+  }
+  .station-label::before { display: none; }
+  .epicenter-icon {
+    font-size: 22px;
+    line-height: 1;
+    color: #0f172a;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .radius-label {
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: #b91c1c;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+    white-space: nowrap;
+  }
+
+  /* Screen Shake Animation */
+  .shaking {
+    animation: quakeAnim 0.12s linear infinite;
+  }
+  @keyframes quakeAnim {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(-6px, 4px) rotate(-0.4deg); }
+    50% { transform: translate(7px, -5px) rotate(0.5deg); }
+    75% { transform: translate(-4px, -3px) rotate(-0.3deg); }
+    100% { transform: translate(5px, 5px) rotate(0.3deg); }
+  }
+
+  /* HUD Overlays */
+  .hud-legend {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid #94a3b8;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    color: #0f172a;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    z-index: 500;
+  }
+  .hud-legend h4 { font-size: 0.72rem; text-transform: uppercase; margin-bottom: 6px; color: #475569; }
+  .legend-item { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-weight: 600; }
+  .legend-icon { width: 18px; display: flex; justify-content: center; align-items: center; }
+
+  .info-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-main);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex;
+    gap: 14px;
+    z-index: 500;
+  }
+  .hud-nav {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 500;
+  }
+  .hud-nav button {
+    width: 36px;
+    height: 36px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  }
+  .hud-nav button:hover { background: #f8fafc; }
+
+  /* Toast Notification */
+  .toast {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: #0f172a;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    z-index: 600;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.25s ease;
+    pointer-events: none;
+    max-width: 340px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .leaflet-control-attribution { font-size: 0.62rem !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌋 SEISMULATION</h1>
+    <div class="subtitle">Simulasi Episentrum Interaktif di Peta Digital: Tentukan 3 Stasiun, Hitung Rumus Laska & Temukan Episentrum Sendiri</div>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <!-- 1. Custom Stations Setup -->
+    <div class="card" style="border-left: 4px solid var(--primary-light);">
+      <div class="section-title">📍 1. Atur 3 Titik Stasiun Seismik</div>
+      <p style="font-size: 0.72rem; color: #475569; margin-bottom: 8px;">
+        Masukkan koordinat <b>Lat, Lng</b> atau gunakan tombol <b>"Klik di Peta"</b> pada peta digital di sebelah kanan.
+      </p>
+
+      <div class="station-input-group">
+        <div class="station-row">
+          <div class="station-badge">A</div>
+          <span>Lat:</span><input type="number" step="0.0001" id="stAlat" class="coord-input" value="-6.9147">
+          <span>Lng:</span><input type="number" step="0.0001" id="stAlng" class="coord-input" value="107.6098">
+        </div>
+        <div class="station-row">
+          <div class="station-badge">B</div>
+          <span>Lat:</span><input type="number" step="0.0001" id="stBlat" class="coord-input" value="-7.7956">
+          <span>Lng:</span><input type="number" step="0.0001" id="stBlng" class="coord-input" value="110.3695">
+        </div>
+        <div class="station-row">
+          <div class="station-badge">C</div>
+          <span>Lat:</span><input type="number" step="0.0001" id="stClat" class="coord-input" value="-8.6500">
+          <span>Lng:</span><input type="number" step="0.0001" id="stClng" class="coord-input" value="115.2167">
+        </div>
+      </div>
+
+      <div class="tool-grid">
+        <button class="btn btn-primary" id="btnApplyStations">⚡ Picu Gempa</button>
+        <button class="btn" id="btnPickOnMap">🖱️ Klik di Peta</button>
+      </div>
+      <button class="btn" id="btnResetStations" style="width: 100%; margin-top: 6px; font-size: 0.75rem;">
+        🔄 Reset Stasiun & Mulai Baru
+      </button>
+      <p style="font-size: 0.68rem; color: #64748b; margin-top: 8px;">
+        💡 Klik marker segitiga stasiun di peta untuk melihat hasil rekaman <b>Δt</b> dan radius <b>r</b> hasil Rumus Laska.
+      </p>
+    </div>
+
+    <!-- 2. Interactive Tools -->
+    <div class="card">
+      <div class="section-title">🛠️ 2. Kotak Alat Siswa</div>
+      <div class="tool-grid">
+        <button class="btn active" id="toolCompass">📐 Jangka (Tarik)</button>
+        <button class="btn" id="toolMarkEpicenter">⭐ Tandai Episentrum</button>
+        <button class="btn" id="toolPen">✏️ Pen Catatan</button>
+        <button class="btn" id="toolPan">✋ Geser Peta</button>
+      </div>
+
+      <!-- Quick Radius Creator -->
+      <div class="radius-box">
+        <div style="font-size: 0.73rem; font-weight: 700; color: #166534;">🎯 Buat Lingkaran Presisi dari Stasiun:</div>
+        <div class="radius-row">
+          <select id="selStationRadius" style="padding: 4px; font-size: 0.78rem; border-radius: 6px; border: 1px solid #cbd5e1;">
+            <option value="A">Pusat Stasiun A</option>
+            <option value="B">Pusat Stasiun B</option>
+            <option value="C">Pusat Stasiun C</option>
+          </select>
+          <input type="number" id="inExactRadius" placeholder="Radius (km)" style="width: 90px; padding: 4px 6px; font-size: 0.78rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+          <button class="btn btn-primary" id="btnMakeCircle" style="padding: 4px 8px; font-size: 0.75rem;">Buat</button>
+        </div>
+      </div>
+
+      <!-- Undo Action Button -->
+      <div style="margin-top: 8px;">
+        <button class="btn btn-undo" id="btnUndo" style="width: 100%;">
+          ↶ Undo / Batalkan Aksi Terakhir
+        </button>
+      </div>
+
+      <div class="control-row" style="margin-top: 8px;">
+        <span>Tebal Garis:</span>
+        <input type="range" id="lineWidth" min="1" max="8" value="2">
+        <span id="lineWidthVal">2px</span>
+      </div>
+      <div class="control-row">
+        <span>Warna:</span>
+        <input type="color" id="strokeColor" value="#000000">
+        <span id="colorName">Hitam</span>
+      </div>
+    </div>
+
+    <!-- 3. Map Layer Settings -->
+    <div class="card">
+      <div class="section-title">🗺️ 3. Pengaturan Peta</div>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkSatellite"> Tampilkan Citra Satelit
+      </label>
+      <p style="font-size: 0.68rem; color: #64748b; margin-top: 4px;">
+        Peta digital ditenagai oleh OpenStreetMap & Esri, diintegrasikan melalui pustaka <b>Leaflet.js</b>.
+      </p>
+    </div>
+  </aside>
+
+  <!-- Stage Container -->
+  <main class="stage-container" id="stageContainer">
+    <div id="leafletMap"></div>
+
+    <!-- Legend Overlay -->
+    <div class="hud-legend" id="hudLegend">
+      <h4>Legenda</h4>
+      <div class="legend-item">
+        <div class="legend-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <polygon points="12,2 22,20 2,20" fill="#000" />
+            <circle cx="12" cy="14" r="2.5" fill="#fff"/>
+          </svg>
+        </div>
+        <span>Seismic Station</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-icon">
+          <svg width="22" height="12" viewBox="0 0 30 12">
+            <line x1="0" y1="6" x2="30" y2="6" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6,4" />
+          </svg>
+        </div>
+        <span>Garis Radius (Merah Putus-putus)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path d="M12,0 L14,8 L22,4 L16,11 L24,14 L16,16 L22,22 L14,18 L12,24 L10,18 L2,22 L8,16 L0,14 L8,11 L2,4 L10,8 Z" fill="#000"/>
+          </svg>
+        </div>
+        <span>Penanda Episentrum Siswa</span>
+      </div>
+    </div>
+
+    <!-- Info Bar at Bottom-Left -->
+    <div class="info-bar">
+      <span id="coordDisplay">Koordinat: -</span>
+      <span id="zoomDisplay">Zoom: 6</span>
+      <span id="actionDisplay">Alat: Jangka Aktif</span>
+    </div>
+
+    <!-- Navigation HUD -->
+    <div class="hud-nav">
+      <button id="btnZoomIn" title="Perbesar (+)">+</button>
+      <button id="btnZoomOut" title="Perkecil (−)">−</button>
+      <button id="btnResetView" title="Reset Posisi">⟲</button>
+    </div>
+
+    <div class="toast" id="toast">Notifikasi</div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ============ Setup ============
+const stageContainer = document.getElementById('stageContainer');
+const mapEl = document.getElementById('leafletMap');
+
+const DEFAULT_STATIONS = [
+  { id: 'A', name: 'Stasiun A', lat: -6.9147, lng: 107.6098 },
+  { id: 'B', name: 'Stasiun B', lat: -7.7956, lng: 110.3695 },
+  { id: 'C', name: 'Stasiun C', lat: -8.6500, lng: 115.2167 }
+];
+const DEFAULT_EPICENTER = L.latLng(-7.6, 111.3);
+const DEFAULT_CENTER = [-7.8, 111.0];
+const DEFAULT_ZOOM = 6;
+
+// Leaflet Map
+const map = L.map('leafletMap', { zoomControl: false, attributionControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+L.control.attribution({ position: 'topright', prefix: false }).addTo(map);
+
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 18,
+  attribution: 'Tiles &copy; Esri'
+});
+
+const stationMarkers = L.layerGroup().addTo(map);
+const drawingsGroup = L.layerGroup().addTo(map);
+
+let stations = [];
+let secretEpicenter = null;
+let undoStack = []; // stack of arrays of layers
+
+let currentTool = 'compass'; // 'pan', 'compass', 'pen', 'markepicenter', 'pick_station'
+let pickingStationIndex = -1;
+let currentStroke = null;
+let currentCompass = null;
+
+const strokeColor = document.getElementById('strokeColor');
+const lineWidth = document.getElementById('lineWidth');
+const lineWidthVal = document.getElementById('lineWidthVal');
+
+// ============ Geo Helpers ============
+function geoDistanceKm(latlngA, latlngB) {
+  return latlngA.distanceTo(latlngB) / 1000;
+}
+
+function destinationPoint(lat, lng, bearingDeg, distanceKm) {
+  const R = 6371;
+  const delta = distanceKm / R;
+  const theta = bearingDeg * Math.PI / 180;
+  const phi1 = lat * Math.PI / 180;
+  const lambda1 = lng * Math.PI / 180;
+  const phi2 = Math.asin(Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(theta));
+  const lambda2 = lambda1 + Math.atan2(
+    Math.sin(theta) * Math.sin(delta) * Math.cos(phi1),
+    Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2)
+  );
+  return L.latLng(phi2 * 180 / Math.PI, lambda2 * 180 / Math.PI);
+}
+
+// ============ Icons ============
+function stationIcon() {
+  return L.divIcon({
+    className: '',
+    html: '<div class="station-icon-wrap"><div class="tri"></div><div class="dot"></div></div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 20]
+  });
+}
+function epicenterIcon() {
+  return L.divIcon({
+    className: '',
+    html: '<div class="epicenter-icon">★</div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+function radiusLabelIcon(text) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="radius-label">${text}</div>`,
+    iconSize: [90, 16],
+    iconAnchor: [-6, 8]
+  });
+}
+
+// ============ Rendering ============
+function renderStations() {
+  stationMarkers.clearLayers();
+  stations.forEach(st => {
+    const marker = L.marker([st.lat, st.lng], { icon: stationIcon() });
+    let popupHtml = `<b>${st.name}</b><br>${st.lat.toFixed(4)}, ${st.lng.toFixed(4)}`;
+    if (st.r !== undefined) {
+      popupHtml += `<br>Δt = ${st.dtMin}m ${st.dtSec}s<br><b>r = ${st.r} km</b>`;
+    }
+    marker.bindPopup(popupHtml);
+    marker.bindTooltip(st.name, { permanent: true, direction: 'top', offset: [0, -22], className: 'station-label' });
+    marker.addTo(stationMarkers);
+  });
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4200);
+}
+
+// ============ Earthquake Trigger ============
+function triggerEarthquakeCalculation() {
+  if (stations.length < 3) return;
+
+  const isDefault = stations.every((st, i) =>
+    Math.abs(st.lat - DEFAULT_STATIONS[i].lat) < 0.0005 &&
+    Math.abs(st.lng - DEFAULT_STATIONS[i].lng) < 0.0005
+  );
+
+  if (isDefault) {
+    secretEpicenter = DEFAULT_EPICENTER;
+  } else {
+    const avgLat = stations.reduce((s, st) => s + st.lat, 0) / 3;
+    const avgLng = stations.reduce((s, st) => s + st.lng, 0) / 3;
+    secretEpicenter = L.latLng(avgLat + 0.9, avgLng + 1.0);
+  }
+
+  stations.forEach(st => {
+    const dist = geoDistanceKm(L.latLng(st.lat, st.lng), secretEpicenter);
+    st.r = Math.round(dist);
+    const totalMinutes = (st.r / 1000) + 1.0;
+    const mins = Math.floor(totalMinutes);
+    const secs = Math.round((totalMinutes - mins) * 60);
+    st.dtMin = mins;
+    st.dtSec = secs;
+  });
+
+  renderStations();
+
+  stageContainer.classList.remove('shaking');
+  void stageContainer.offsetWidth;
+  stageContainer.classList.add('shaking');
+  setTimeout(() => stageContainer.classList.remove('shaking'), 900);
+
+  showToast('💥 Gempa terjadi! Data Δt telah terekam. Klik marker stasiun di peta untuk melihat hasilnya, lalu tentukan episentrum lewat triangulasi.');
+}
+
+// ============ Sidebar Actions ============
+document.getElementById('btnApplyStations').addEventListener('click', () => {
+  const aLat = parseFloat(document.getElementById('stAlat').value) || 0;
+  const aLng = parseFloat(document.getElementById('stAlng').value) || 0;
+  const bLat = parseFloat(document.getElementById('stBlat').value) || 0;
+  const bLng = parseFloat(document.getElementById('stBlng').value) || 0;
+  const cLat = parseFloat(document.getElementById('stClat').value) || 0;
+  const cLng = parseFloat(document.getElementById('stClng').value) || 0;
+
+  stations = [
+    { id: 'A', name: 'Stasiun A', lat: aLat, lng: aLng },
+    { id: 'B', name: 'Stasiun B', lat: bLat, lng: bLng },
+    { id: 'C', name: 'Stasiun C', lat: cLat, lng: cLng }
+  ];
+
+  renderStations();
+  triggerEarthquakeCalculation();
+  map.fitBounds(stations.map(s => [s.lat, s.lng]), { padding: [80, 80], maxZoom: 9 });
+});
+
+document.getElementById('btnPickOnMap').addEventListener('click', () => {
+  stations = [];
+  stationMarkers.clearLayers();
+  pickingStationIndex = 0;
+  currentTool = 'pick_station';
+  toolButtons.forEach(t => document.getElementById(t).classList.remove('active'));
+  mapEl.style.cursor = 'crosshair';
+  document.getElementById('actionDisplay').textContent = 'Mode: Klik Stasiun A di Peta';
+  showToast('👉 Klik di peta untuk menaruh titik <b>Stasiun A</b>');
+});
+
+document.getElementById('btnResetStations').addEventListener('click', () => {
+  stations = [];
+  undoStack = [];
+  secretEpicenter = null;
+  stationMarkers.clearLayers();
+  drawingsGroup.clearLayers();
+  showToast('Semua data stasiun dan gambar telah di-reset.');
+});
+
+document.getElementById('btnUndo').addEventListener('click', () => {
+  if (undoStack.length > 0) {
+    const layers = undoStack.pop();
+    layers.forEach(l => l && drawingsGroup.removeLayer(l));
+    showToast('↶ Aksi terakhir berhasil dibatalkan.');
+  } else {
+    showToast('Tidak ada aksi yang bisa dibatalkan.');
+  }
+});
+
+document.getElementById('btnMakeCircle').addEventListener('click', () => {
+  const stId = document.getElementById('selStationRadius').value;
+  const targetSt = stations.find(s => s.id === stId);
+  const rVal = parseFloat(document.getElementById('inExactRadius').value);
+
+  if (!targetSt) {
+    showToast('⚠️ Pasang stasiun terlebih dahulu!');
+    return;
+  }
+  if (!rVal || rVal <= 0) {
+    showToast('⚠️ Masukkan nilai radius yang valid (km)!');
+    return;
+  }
+
+  const bearing = (stId === 'A') ? 45 : (stId === 'B') ? 135 : -60;
+  const edge = destinationPoint(targetSt.lat, targetSt.lng, bearing, rVal);
+
+  const circle = L.circle([targetSt.lat, targetSt.lng], {
+    radius: rVal * 1000,
+    color: strokeColor.value,
+    weight: parseInt(lineWidth.value, 10),
+    fill: false
+  }).addTo(drawingsGroup);
+
+  const line = L.polyline([[targetSt.lat, targetSt.lng], edge], {
+    color: '#dc2626', weight: 1.8, dashArray: '5,4'
+  }).addTo(drawingsGroup);
+
+  const label = L.marker(edge, { icon: radiusLabelIcon(`r = ${rVal} km`), interactive: false }).addTo(drawingsGroup);
+
+  undoStack.push([circle, line, label]);
+  showToast(`✅ Lingkaran stasiun ${stId} (r = ${rVal} km) berhasil dibuat lengkap dengan garis radius putus-putus merah.`);
+});
+
+// Tool Switching
+const toolButtons = ['toolCompass', 'toolMarkEpicenter', 'toolPen', 'toolPan'];
+toolButtons.forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    toolButtons.forEach(t => document.getElementById(t).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    currentTool = id.replace('tool', '').toLowerCase();
+
+    if (currentTool === 'pan') {
+      mapEl.style.cursor = '';
+      document.getElementById('actionDisplay').textContent = 'Alat: Geser Peta';
+    } else if (currentTool === 'compass') {
+      mapEl.style.cursor = 'crosshair';
+      document.getElementById('actionDisplay').textContent = 'Alat: Jangka (Tarik Lingkaran)';
+    } else if (currentTool === 'pen') {
+      mapEl.style.cursor = 'crosshair';
+      document.getElementById('actionDisplay').textContent = 'Alat: Pen Catatan';
+    } else if (currentTool === 'markepicenter') {
+      mapEl.style.cursor = 'crosshair';
+      document.getElementById('actionDisplay').textContent = 'Alat: Klik untuk Menandai Episentrum';
+    }
+  });
+});
+
+lineWidth.addEventListener('input', (e) => lineWidthVal.textContent = e.target.value + 'px');
+
+document.getElementById('chkSatellite').addEventListener('change', (e) => {
+  if (e.target.checked) {
+    map.removeLayer(osmLayer);
+    satLayer.addTo(map);
+  } else {
+    map.removeLayer(satLayer);
+    osmLayer.addTo(map);
+  }
+});
+
+// Navigation Zoom / Pan
+document.getElementById('btnZoomIn').addEventListener('click', () => map.zoomIn());
+document.getElementById('btnZoomOut').addEventListener('click', () => map.zoomOut());
+document.getElementById('btnResetView').addEventListener('click', () => map.setView(DEFAULT_CENTER, DEFAULT_ZOOM));
+
+map.on('zoomend', () => {
+  document.getElementById('zoomDisplay').textContent = `Zoom: ${map.getZoom()}`;
+});
+
+// ============ Map Interactions ============
+map.on('mousemove', (e) => {
+  document.getElementById('coordDisplay').textContent = `Koordinat: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+
+  if (currentTool === 'pen' && currentStroke) {
+    currentStroke.points.push(e.latlng);
+    if (currentStroke.layer) drawingsGroup.removeLayer(currentStroke.layer);
+    currentStroke.layer = L.polyline(currentStroke.points, {
+      color: strokeColor.value, weight: parseInt(lineWidth.value, 10)
+    }).addTo(drawingsGroup);
+  } else if (currentTool === 'compass' && currentCompass) {
+    currentCompass.edge = e.latlng;
+    const rKm = geoDistanceKm(currentCompass.center, currentCompass.edge);
+    currentCompass.r = rKm;
+    if (currentCompass.layer) drawingsGroup.removeLayer(currentCompass.layer);
+    if (currentCompass.lineLayer) drawingsGroup.removeLayer(currentCompass.lineLayer);
+    if (currentCompass.labelLayer) drawingsGroup.removeLayer(currentCompass.labelLayer);
+    currentCompass.layer = L.circle(currentCompass.center, {
+      radius: rKm * 1000, color: strokeColor.value, weight: parseInt(lineWidth.value, 10), fill: false
+    }).addTo(drawingsGroup);
+    currentCompass.lineLayer = L.polyline([currentCompass.center, currentCompass.edge], {
+      color: '#dc2626', weight: 1.8, dashArray: '5,4'
+    }).addTo(drawingsGroup);
+    currentCompass.labelLayer = L.marker(currentCompass.edge, {
+      icon: radiusLabelIcon(`r = ${Math.round(rKm)} km`), interactive: false
+    }).addTo(drawingsGroup);
+  }
+});
+
+map.on('mousedown', (e) => {
+  if (currentTool === 'pen') {
+    map.dragging.disable();
+    currentStroke = { points: [e.latlng], layer: null };
+  } else if (currentTool === 'compass') {
+    map.dragging.disable();
+    let center = e.latlng;
+    let minPx = 32;
+    const evPoint = map.latLngToContainerPoint(e.latlng);
+    stations.forEach(st => {
+      const stPoint = map.latLngToContainerPoint([st.lat, st.lng]);
+      const d = stPoint.distanceTo(evPoint);
+      if (d < minPx) { center = L.latLng(st.lat, st.lng); minPx = d; }
+    });
+    currentCompass = { center, edge: e.latlng, r: 0, layer: null, lineLayer: null, labelLayer: null };
+  }
+});
+
+function finishDrawing() {
+  if (currentTool === 'pen' && currentStroke) {
+    map.dragging.enable();
+    if (currentStroke.points.length > 1 && currentStroke.layer) {
+      undoStack.push([currentStroke.layer]);
+    } else if (currentStroke.layer) {
+      drawingsGroup.removeLayer(currentStroke.layer);
+    }
+    currentStroke = null;
+  } else if (currentTool === 'compass' && currentCompass) {
+    map.dragging.enable();
+    if (currentCompass.r > 0.3) {
+      undoStack.push([currentCompass.layer, currentCompass.lineLayer, currentCompass.labelLayer]);
+    } else {
+      [currentCompass.layer, currentCompass.lineLayer, currentCompass.labelLayer].forEach(l => l && drawingsGroup.removeLayer(l));
+    }
+    currentCompass = null;
+  }
+}
+map.on('mouseup', finishDrawing);
+document.addEventListener('pointerup', () => {
+  if (currentStroke || currentCompass) finishDrawing();
+});
+
+map.on('click', (e) => {
+  // 1. Pick Station mode
+  if (currentTool === 'pick_station') {
+    const latlng = e.latlng;
+    if (pickingStationIndex === 0) {
+      stations.push({ id: 'A', name: 'Stasiun A', lat: latlng.lat, lng: latlng.lng });
+      document.getElementById('stAlat').value = latlng.lat.toFixed(4);
+      document.getElementById('stAlng').value = latlng.lng.toFixed(4);
+      pickingStationIndex = 1;
+      renderStations();
+      showToast('✅ Stasiun A terpasang! Sekarang klik di peta untuk <b>Stasiun B</b>');
+    } else if (pickingStationIndex === 1) {
+      stations.push({ id: 'B', name: 'Stasiun B', lat: latlng.lat, lng: latlng.lng });
+      document.getElementById('stBlat').value = latlng.lat.toFixed(4);
+      document.getElementById('stBlng').value = latlng.lng.toFixed(4);
+      pickingStationIndex = 2;
+      renderStations();
+      showToast('✅ Stasiun B terpasang! Sekarang klik di peta untuk <b>Stasiun C</b>');
+    } else if (pickingStationIndex === 2) {
+      stations.push({ id: 'C', name: 'Stasiun C', lat: latlng.lat, lng: latlng.lng });
+      document.getElementById('stClat').value = latlng.lat.toFixed(4);
+      document.getElementById('stClng').value = latlng.lng.toFixed(4);
+      pickingStationIndex = -1;
+      renderStations();
+      document.getElementById('toolCompass').click();
+      triggerEarthquakeCalculation();
+    }
+    return;
+  }
+
+  // 2. Mark Epicenter Mode
+  if (currentTool === 'markepicenter') {
+    const marker = L.marker(e.latlng, { icon: epicenterIcon() });
+    marker.bindTooltip(`Episentrum Siswa (${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)})`, { direction: 'top', offset: [0, -10] });
+    marker.addTo(drawingsGroup);
+    undoStack.push([marker]);
+    showToast(`⭐ Titik Episentrum berhasil ditandai di (${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)})!`);
+  }
+});
+
+// ============ Default Initialization ============
+stations = DEFAULT_STATIONS.map(s => ({ ...s }));
+renderStations();
+triggerEarthquakeCalculation();
+map.fitBounds(stations.map(s => [s.lat, s.lng]), { padding: [80, 80], maxZoom: 8 });
+</script>
+
+</body>
+</html>
